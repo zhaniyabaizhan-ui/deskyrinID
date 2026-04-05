@@ -1,16 +1,17 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type {
   ApplicationFormData,
+  DocumentAttachment,
   EnglishExamType,
   ProgramId,
-  SimulatedUpload,
   SubjectCombination,
   SubmittedApplication,
 } from '@/types/application'
 import { createEmptyForm } from '@/types/application'
 import { submitApplication } from '@/engine/evaluateApplication'
 import { useApplications } from '@/context/ApplicationsContext'
+import { DualPathDocumentSlot } from '@/components/apply/DualPathDocumentSlot'
 import { Card, CardHeader } from '@/components/ui/Card'
 import { TierBadge, RiskBadge } from '@/components/ui/Badge'
 import { VIDEO_PRESENTATION_PROMPTS } from '@/data/videoPrompts'
@@ -20,68 +21,15 @@ import {
   SUBJECT_COMBO_LABELS,
 } from '@/data/programs'
 import { DEMO_PRESETS, defaultDemoPreset } from '@/demo/presets'
+import { SAMPLE_PERSONAL } from '@/data/samplePersonal'
+import { PROGRAM_SUBJECT_GUIDE } from '@/data/programGuide'
+import { routingDetail, routingHeadline } from '@/data/routingCopy'
 
 type ApplyMode = 'demo' | 'manual'
 
-function SimulatedDrop({
-  label,
-  required,
-  value,
-  onChange,
-}: {
-  label: string
-  required?: boolean
-  value: SimulatedUpload
-  onChange: (v: SimulatedUpload) => void
-}) {
-  return (
-    <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/80 p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-sm font-medium text-slate-800">
-          {label}
-          {required ? <span className="text-red-500"> *</span> : null}
-        </span>
-        {value.attached ? (
-          <span className="rounded-full bg-lime-100 px-2 py-0.5 text-xs font-medium text-lime-900">
-            Simulated
-          </span>
-        ) : (
-          <span className="text-xs text-slate-400">Not attached</span>
-        )}
-      </div>
-      {value.attached && value.fileName ? (
-        <p className="mt-2 font-mono text-xs text-slate-600">{value.fileName}</p>
-      ) : null}
-      <div className="mt-3 flex flex-wrap gap-2">
-        {!value.attached ? (
-          <button
-            type="button"
-            onClick={() =>
-              onChange({
-                attached: true,
-                fileName: 'synthetic_placeholder.pdf',
-              })
-            }
-            className="rounded-lg bg-lime-400 px-3 py-1.5 text-sm font-semibold text-lime-950 shadow-sm hover:bg-lime-300"
-          >
-            Simulate upload
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => onChange({ attached: false })}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50"
-          >
-            Remove
-          </button>
-        )}
-      </div>
-    </div>
-  )
-}
-
 export default function ApplyPage() {
   const { addApplication } = useApplications()
+  const portfolioInputRef = useRef<HTMLInputElement>(null)
   const [mode, setMode] = useState<ApplyMode>('demo')
   const [form, setForm] = useState<ApplicationFormData>(createEmptyForm())
   const [presetId, setPresetId] = useState<string>(defaultDemoPreset().id)
@@ -115,6 +63,61 @@ export default function ApplyPage() {
 
   const subjectKeys = Object.keys(SUBJECT_COMBO_LABELS) as SubjectCombination[]
 
+  const setPortfolioItem = (index: number, v: DocumentAttachment) => {
+    setForm((f) => ({
+      ...f,
+      uploads: {
+        ...f.uploads,
+        portfolio: f.uploads.portfolio.map((p, i) => (i === index ? v : p)),
+      },
+    }))
+  }
+
+  const addPortfolioFromDevice = (files: FileList | null) => {
+    if (!files?.length) return
+    setForm((f) => ({
+      ...f,
+      uploads: {
+        ...f.uploads,
+        portfolio: [
+          ...f.uploads.portfolio,
+          ...Array.from(files).map((file) => ({
+            attached: true as const,
+            fileName: file.name,
+            source: 'uploaded' as const,
+          })),
+        ],
+      },
+    }))
+  }
+
+  const addPortfolioDemo = () => {
+    setForm((f) => ({
+      ...f,
+      uploads: {
+        ...f.uploads,
+        portfolio: [
+          ...f.uploads.portfolio,
+          {
+            attached: true,
+            fileName: `demo_portfolio_${f.uploads.portfolio.length + 1}.pdf`,
+            source: 'demo' as const,
+          },
+        ],
+      },
+    }))
+  }
+
+  const removePortfolio = (index: number) => {
+    setForm((f) => ({
+      ...f,
+      uploads: {
+        ...f.uploads,
+        portfolio: f.uploads.portfolio.filter((_, i) => i !== index),
+      },
+    }))
+  }
+
   return (
     <div className="space-y-8">
       <div>
@@ -122,16 +125,15 @@ export default function ApplyPage() {
           Application portal
         </h1>
         <p className="mt-2 max-w-2xl text-slate-600">
-          Submit your materials for inVision U. Use <strong>Demo mode</strong> for a
-          one-click judge path, or <strong>Manual mode</strong> to walk the form
-          realistically.
+          Submit your materials for inVision U. Use <strong>Demo application</strong> for a
+          one-click judge path, or <strong>Manual application</strong> for a realistic walkthrough.
         </p>
       </div>
 
       <Card>
         <CardHeader
           title="Application mode"
-          subtitle="Demo mode is optimized for hackathon judges — prefilled synthetic data and simulated files."
+          subtitle="Demo mode autofills synthetic data and demo files. Manual mode is for end-to-end testing as a candidate."
         />
         <div className="flex flex-wrap gap-3">
           <button
@@ -161,9 +163,9 @@ export default function ApplyPage() {
         {mode === 'demo' ? (
           <div className="mt-6 space-y-4 rounded-xl bg-lime-50/60 p-4 ring-1 ring-lime-200">
             <p className="text-sm text-lime-950">
-              <strong>Fast path:</strong> choose a preset package (add more in{' '}
+              <strong>Fast path (&lt;30s):</strong> add presets in{' '}
               <code className="rounded bg-white/80 px-1">src/demo/presets/</code>
-              ), then either load the form to edit, or submit immediately.
+              — then load the form or submit in one click.
             </p>
             <div className="flex flex-wrap items-end gap-3">
               <label className="text-sm text-slate-700">
@@ -200,8 +202,8 @@ export default function ApplyPage() {
           </div>
         ) : (
           <p className="mt-4 text-sm text-slate-600">
-            Fill each section. Simulated uploads stand in for real PDFs until you
-            connect storage.
+            Use real file picks where you want; the MVP still only stores file names for display
+            (no server upload).
           </p>
         )}
       </Card>
@@ -210,7 +212,18 @@ export default function ApplyPage() {
         <Card>
           <CardHeader
             title="A. Personal information"
-            subtitle="Used for identification and contact — not for automated scoring."
+            subtitle="Identification and contact only — not used in automated scoring."
+            action={
+              <button
+                type="button"
+                onClick={() =>
+                  setForm((f) => ({ ...f, personal: { ...SAMPLE_PERSONAL } }))
+                }
+                className="shrink-0 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-800 ring-1 ring-slate-200 hover:bg-slate-200"
+              >
+                Autofill sample personal info
+              </button>
+            }
           />
           <div className="grid gap-4 sm:grid-cols-2">
             {(
@@ -241,16 +254,22 @@ export default function ApplyPage() {
             ))}
           </div>
           <p className="mt-4 text-xs text-slate-500">
-            Upload a passport or ID document below instead of entering national ID
-            numbers.
+            We do not collect national ID numbers here — upload passport or ID in the documents
+            section below.
           </p>
         </Card>
 
         <Card>
           <CardHeader
             title="B. Program & academics"
-            subtitle="Subject combination must align with your selected program."
+            subtitle="Your subject combination must be valid for the program you select."
           />
+          <div className="mb-5 rounded-xl border border-lime-200 bg-lime-50/50 p-4 text-sm text-slate-800">
+            <p className="font-semibold text-lime-950">Eligibility mapping</p>
+            <p className="mt-2 whitespace-pre-line leading-relaxed text-slate-700">
+              {PROGRAM_SUBJECT_GUIDE}
+            </p>
+          </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="text-sm text-slate-700 sm:col-span-2">
               Program track
@@ -344,21 +363,22 @@ export default function ApplyPage() {
             </div>
           </div>
           <p className="mt-3 text-xs text-slate-500">
-            Kazakhstan citizens: ENT ≥ 80 required when eligible. English: IELTS ≥
-            6, TOEFL ≥ 80, Duolingo ≥ 105, other ≥ 65 (demo scale).
+            Kazakhstan applicants: ENT ≥ 80 when eligible. English: IELTS ≥ 6, TOEFL ≥ 80,
+            Duolingo ≥ 105, other ≥ 65 (demo scale).
           </p>
         </Card>
 
         <Card>
           <CardHeader
-            title="C. Required uploads (simulated)"
-            subtitle="MVP uses placeholders — swap in real storage later."
+            title="C. Required documents"
+            subtitle="Upload from your device or attach a demo placeholder — both paths count for completeness in this MVP."
           />
           <div className="grid gap-4 md:grid-cols-2">
-            <SimulatedDrop
+            <DualPathDocumentSlot
               label="Passport / ID (PDF or image)"
               required
               value={form.uploads.passportOrId}
+              demoFileName="demo_passport.pdf"
               onChange={(v) =>
                 setForm((f) => ({
                   ...f,
@@ -366,10 +386,11 @@ export default function ApplyPage() {
                 }))
               }
             />
-            <SimulatedDrop
+            <DualPathDocumentSlot
               label="ENT certificate"
               required
               value={form.uploads.entCertificate}
+              demoFileName="demo_ent_certificate.pdf"
               onChange={(v) =>
                 setForm((f) => ({
                   ...f,
@@ -377,10 +398,11 @@ export default function ApplyPage() {
                 }))
               }
             />
-            <SimulatedDrop
+            <DualPathDocumentSlot
               label="English certificate"
               required
               value={form.uploads.englishCertificate}
+              demoFileName="demo_english_certificate.pdf"
               onChange={(v) =>
                 setForm((f) => ({
                   ...f,
@@ -389,62 +411,57 @@ export default function ApplyPage() {
               }
             />
           </div>
-          <div className="mt-6">
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-sm font-medium text-slate-800">
+
+          <div className="mt-8 border-t border-slate-100 pt-6">
+            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <span className="text-sm font-semibold text-slate-900">
                 Portfolio / additional documents
               </span>
-              <button
-                type="button"
-                onClick={() =>
-                  setForm((f) => ({
-                    ...f,
-                    uploads: {
-                      ...f.uploads,
-                      portfolio: [
-                        ...f.uploads.portfolio,
-                        {
-                          attached: true,
-                          fileName: `portfolio_${f.uploads.portfolio.length + 1}.pdf`,
-                        },
-                      ],
-                    },
-                  }))
-                }
-                className="text-sm font-semibold text-lime-800 hover:text-lime-900"
-              >
-                + Add simulated file
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <input
+                  ref={portfolioInputRef}
+                  type="file"
+                  className="sr-only"
+                  multiple
+                  accept=".pdf,.png,.jpg,.jpeg,image/*,application/pdf"
+                  onChange={(e) => {
+                    addPortfolioFromDevice(e.target.files)
+                    e.target.value = ''
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => portfolioInputRef.current?.click()}
+                  className="rounded-lg bg-white px-3 py-1.5 text-sm font-semibold text-slate-800 ring-1 ring-slate-200 hover:bg-slate-50"
+                >
+                  Add from device
+                </button>
+                <button
+                  type="button"
+                  onClick={addPortfolioDemo}
+                  className="rounded-lg bg-lime-400 px-3 py-1.5 text-sm font-semibold text-lime-950 hover:bg-lime-300"
+                >
+                  Add demo document
+                </button>
+              </div>
             </div>
             {form.uploads.portfolio.length === 0 ? (
-              <p className="rounded-lg bg-slate-50 py-8 text-center text-sm text-slate-500">
-                No portfolio files yet — add at least one for a complete application.
+              <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50 py-10 text-center text-sm text-slate-500">
+                Add at least one portfolio or supporting PDF for a complete application.
               </p>
             ) : (
-              <ul className="space-y-2">
+              <ul className="space-y-4">
                 {form.uploads.portfolio.map((p, i) => (
-                  <li
-                    key={i}
-                    className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
-                  >
-                    <span className="font-mono text-xs">{p.fileName}</span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setForm((f) => ({
-                          ...f,
-                          uploads: {
-                            ...f.uploads,
-                            portfolio: f.uploads.portfolio.filter(
-                              (_, j) => j !== i
-                            ),
-                          },
-                        }))
-                      }
-                      className="text-red-600 hover:underline"
-                    >
-                      Remove
-                    </button>
+                  <li key={`${i}-${p.fileName ?? ''}`}>
+                    <DualPathDocumentSlot
+                      label={`Portfolio file ${i + 1}`}
+                      value={p}
+                      demoFileName={`demo_portfolio_${i + 1}.pdf`}
+                      onChange={(v) => {
+                        if (!v.attached) removePortfolio(i)
+                        else setPortfolioItem(i, v)
+                      }}
+                    />
                   </li>
                 ))}
               </ul>
@@ -455,11 +472,12 @@ export default function ApplyPage() {
         <Card>
           <CardHeader
             title="D. Video presentation"
-            subtitle="Primary qualitative input is your video story — transcript stands in for ASR in this MVP."
+            subtitle="There is no separate motivation essay. Your story lives in the video and in the transcript or detailed summary below (MVP substitute for speech-to-text)."
           />
           <div className="mb-6 rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200">
             <p className="text-sm font-semibold text-slate-800">
-              Address these prompts in your recording:
+              Cover these questions in your recording (scoring looks for related themes in your
+              transcript):
             </p>
             <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-slate-600">
               {VIDEO_PRESENTATION_PROMPTS.map((q) => (
@@ -477,29 +495,41 @@ export default function ApplyPage() {
             />
           </label>
           <div className="mt-4">
-            <SimulatedDrop
-              label="Or: video file (simulated)"
+            <DualPathDocumentSlot
+              label="Video file (optional if link or transcript is provided)"
               value={form.videoFile}
+              accept="video/*"
+              demoFileName="demo_presentation.mp4"
               onChange={(v) => update({ videoFile: v })}
             />
           </div>
+          <p className="mt-2 text-xs text-slate-500">
+            Completeness requires a video link, a video file, or a transcript/summary of at least
+            ~50 characters.
+          </p>
           <label className="mt-6 block text-sm text-slate-700">
-            Video transcript or summary (used for explainable text analysis)
+            Video transcript or detailed summary
             <textarea
               value={form.videoTranscript}
               onChange={(e) => update({ videoTranscript: e.target.value })}
               rows={10}
               className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-              placeholder="Paste transcript or a detailed summary of what you said on video."
+              placeholder="Paste a transcript or write what you said, aligned to the prompts above."
             />
           </label>
         </Card>
 
         <Card>
           <CardHeader
-            title="E. Personality snapshot (MVP)"
-            subtitle="Short placeholder for a full assessment — replace with your instrument export later."
+            title="E. Behavioral & working-style note"
+            subtitle="Optional context for the committee — not a personality test and not a primary admission criterion."
           />
+          <p className="mb-4 text-sm text-slate-600">
+            Use this space for a short note (e.g. from a counselor, referee, or self-reflection on
+            how you work with others). It supports human review alongside your video story; it{' '}
+            <strong>does not</strong> replace transcript scoring and does not decide outcomes on its
+            own.
+          </p>
           <label className="text-sm text-slate-700">
             Summary for committee
             <textarea
@@ -512,14 +542,18 @@ export default function ApplyPage() {
               }
               rows={4}
               className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              placeholder="e.g. collaborative, responds well to structured feedback, steady under deadlines…"
             />
           </label>
+          <p className="mt-2 text-xs text-slate-500">
+            Optional numeric sliders — informal self- or third-party estimates for discussion only.
+          </p>
           <div className="mt-4 grid gap-4 sm:grid-cols-3">
             {(
               [
-                ['openness', 'Openness (0–100)'],
-                ['conscientiousness', 'Conscientiousness (0–100)'],
-                ['collaboration', 'Collaboration (0–100)'],
+                ['openness', 'Openness to new ideas (0–100)'],
+                ['conscientiousness', 'Follow-through / reliability (0–100)'],
+                ['collaboration', 'Collaboration style (0–100)'],
               ] as const
             ).map(([key, lab]) => (
               <label key={key} className="text-sm text-slate-700">
@@ -574,48 +608,64 @@ export default function ApplyPage() {
       {lastSubmitted ? (
         <Card className="border-lime-300 bg-lime-50/40">
           <CardHeader title="Submission result" />
-          <div className="flex flex-wrap items-center gap-3">
-            <TierBadge tier={lastSubmitted.evaluation.recommendation} />
-            {lastSubmitted.evaluation.overallScore !== null ? (
-              <span className="text-sm font-medium text-slate-800">
-                Overall score:{' '}
-                <strong>{lastSubmitted.evaluation.overallScore}</strong>/100
-              </span>
-            ) : null}
-            <RiskBadge
-              label="Transcript"
-              level={lastSubmitted.evaluation.textAuthenticityRisk}
-            />
-            <RiskBadge
-              label="Video"
-              level={lastSubmitted.evaluation.videoAuthenticityRisk}
-            />
+          <div className="rounded-xl border border-lime-200 bg-white/90 p-4">
+            <p className="text-lg font-bold text-slate-900">
+              {routingHeadline(lastSubmitted.evaluation.recommendation)}
+            </p>
+            <p className="mt-2 text-sm text-slate-600">
+              {routingDetail(lastSubmitted.evaluation.recommendation)}
+            </p>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <TierBadge tier={lastSubmitted.evaluation.recommendation} />
+              {lastSubmitted.evaluation.overallScore !== null ? (
+                <span className="text-sm font-medium text-slate-800">
+                  Overall score:{' '}
+                  <strong>{lastSubmitted.evaluation.overallScore}</strong>/100
+                </span>
+              ) : null}
+              <RiskBadge
+                label="Transcript"
+                level={lastSubmitted.evaluation.textAuthenticityRisk}
+              />
+              <RiskBadge
+                label="Video"
+                level={lastSubmitted.evaluation.videoAuthenticityRisk}
+              />
+            </div>
           </div>
-          <p className="mt-2 font-mono text-xs text-slate-600">
+          <p className="mt-3 font-mono text-xs text-slate-600">
             ID {lastSubmitted.id}
           </p>
-          <ul className="mt-4 space-y-1 text-sm text-slate-700">
+          <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Hard rules
+          </p>
+          <ul className="mt-2 space-y-1 text-sm text-slate-700">
             {lastSubmitted.evaluation.hardRuleSummary.map((line) => (
               <li key={line}>{line}</li>
             ))}
           </ul>
           {lastSubmitted.evaluation.explanationTags.length > 0 ? (
-            <div className="mt-4 flex flex-wrap gap-2">
-              {lastSubmitted.evaluation.explanationTags.map((t) => (
-                <span
-                  key={t}
-                  className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-slate-700 ring-1 ring-slate-200"
-                >
-                  {t}
-                </span>
-              ))}
-            </div>
+            <>
+              <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Explanation tags
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {lastSubmitted.evaluation.explanationTags.map((t) => (
+                  <span
+                    key={t}
+                    className="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-slate-700 ring-1 ring-slate-200"
+                  >
+                    {t}
+                  </span>
+                ))}
+              </div>
+            </>
           ) : null}
           <Link
             to="/dashboard"
             className="mt-6 inline-block text-sm font-bold text-lime-800 hover:underline"
           >
-            Review in dashboard →
+            Open full review in dashboard →
           </Link>
         </Card>
       ) : null}

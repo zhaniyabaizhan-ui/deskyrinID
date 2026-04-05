@@ -25,23 +25,28 @@ function buildStubForm(): ApplicationFormData {
       passportOrId: {
         attached: true,
         fileName: 'placeholder_passport.pdf',
+        source: 'demo',
       },
       entCertificate: {
         attached: true,
         fileName: 'placeholder_ent_certificate.pdf',
+        source: 'demo',
       },
       englishCertificate: {
         attached: true,
         fileName: 'placeholder_ielts.pdf',
+        source: 'demo',
       },
       portfolio: [
         {
           attached: true,
           fileName: 'placeholder_portfolio_project_1.pdf',
+          source: 'demo',
         },
         {
           attached: true,
           fileName: 'placeholder_portfolio_project_2.pdf',
+          source: 'demo',
         },
       ],
     },
@@ -60,7 +65,7 @@ My family supports my decision; my mother is my biggest encouragement — she re
 I value integrity and curiosity. I know I still have a lot to learn, but I'm ready to work hard and listen.`,
     personality: {
       summary:
-        'Stub summary: collaborative, moderately extraverted, comfortable with structured tasks; prefers clear goals. (Replace with real test export later.)',
+        'Behavioral note (demo): works well in structured teams; open to feedback; steady under deadlines. Supportive signal for committee context only.',
       openness: 72,
       conscientiousness: 68,
       collaboration: 74,

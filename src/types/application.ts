@@ -14,12 +14,15 @@ export type SubjectCombination =
 
 export type EnglishExamType = 'IELTS' | 'TOEFL' | 'Duolingo' | 'other'
 
-/** Simulated file attachment — no binary stored in MVP. */
-export type SimulatedUpload = {
+/** Document slot — real “upload” stores filename only in MVP; demo path for judges. */
+export type DocumentAttachment = {
   attached: boolean
-  /** Shown in UI / committee list */
   fileName?: string
+  source?: 'uploaded' | 'demo'
 }
+
+/** @deprecated Use DocumentAttachment — kept as alias for presets / older code. */
+export type SimulatedUpload = DocumentAttachment
 
 export type PersonalitySummary = {
   /** Short prose for committee + scoring hints */
@@ -85,13 +88,18 @@ export type EligibilityFailureReason =
 
 export type RiskLevel = 'low' | 'medium' | 'high'
 
+/**
+ * Subscores aligned to inVision U video prompts (+ communication + portfolio).
+ * Derived from transcript/summary heuristics only — not demographics.
+ */
 export type MeritSubscores = {
-  motivation: number
-  leadership: number
-  resilienceGrowth: number
-  teamworkProblemSolving: number
-  communication: number
-  programAlignment: number
+  motivationInVisionU: number
+  programFit: number
+  resilienceChallenge: number
+  goalsAndPurpose: number
+  leadershipEvidence: number
+  supportSystemEncouragement: number
+  communicationClarity: number
   portfolioEvidence: number
 }
 

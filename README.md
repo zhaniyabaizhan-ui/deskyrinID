@@ -6,42 +6,45 @@ Decision-support platform for **applicants** and the **admissions committee**. I
 
 | Area | Route | Purpose |
 |------|--------|---------|
-| Applicant portal | `/apply` | Collect application data, simulated uploads, video transcript, personality snapshot; run pipeline; show routing result. |
-| Committee dashboard | `/dashboard` | Search/filter candidates, inspect scores, explanations, authenticity **risk** flags, transcript, and committee notes / shortlist toggles. |
+| Applicant portal | `/apply` | **Demo** or **manual** application; documents (device upload or demo file); video link/file; **transcript-first** qualitative input; pipeline result. |
+| Committee dashboard | `/dashboard` | **Routing summary** up front; full package, hard rules, merit breakdown, explanation tags, authenticity **risk signals**, rationale, committee notes. |
 
-Personal identity fields (name, contact, location, passport upload metadata) are used for **identification and review context** only — they **do not** feed the scoring heuristics.
+Personal identity fields (name, contact, location, passport metadata) are **identification / review context only** — they **do not** feed scoring heuristics.
+
+## Applicant UX (MVP)
+
+- **Autofill sample personal info** — one click for synthetic contact data (judges; not scored).
+- **Dual-path documents** — each required slot supports **Upload file** (stores filename only) or **Use demo file**.
+- **Portfolio** — **Add from device** (multi-file) or **Add demo document**; rows use the same dual-path control.
+- **Program block** — shows subject→program eligibility mapping inline.
+- **Behavioral & working-style note** — optional committee context; **not** a personality test and **not** a primary admission basis.
 
 ## Scoring pipeline (explainable, multi-stage)
 
-1. **Completeness** — required personal fields, program, subject combination, ENT, English exam + score, simulated uploads (passport, ENT, English, ≥1 portfolio), video (URL or simulated file), personality summary. If anything is missing → **Incomplete** (no merit score).
-2. **Eligibility** — Kazakhstan-linked applicants: **ENT ≥ 80**; English thresholds (IELTS ≥ 6, TOEFL ≥ 80, Duolingo ≥ 105, other ≥ 65 on demo scale); **subject combination must match** the selected program. If any fail → **Ineligible**.
-3. **Merit (eligible only)** — Heuristic scoring on **video transcript + personality summary** and portfolio flags: motivation, leadership, resilience/growth, teamwork/problem-solving, communication, program alignment, portfolio evidence. **Overall score** is a weighted blend. Recommendation: **Priority review**, **Standard review**, or **Manual review** (with small adjustments for medium/high authenticity risk).
+1. **Completeness** — personal fields, program, subject combination, ENT, English, required documents (≥1 portfolio attached), **video link OR video file OR transcript/summary (≥~50 chars)**, behavioral note summary. Missing items → **Incomplete** (no merit score).
+2. **Eligibility** — Kazakhstan-linked applicants: **ENT ≥ 80**; English thresholds (IELTS ≥ 6, TOEFL ≥ 80, Duolingo ≥ 105, other ≥ 65 demo scale); **subject combination matches program**. Fail → **Ineligible**.
+3. **Merit (eligible only)** — Heuristic scoring on **transcript/summary** (aligned to the six official video questions) plus optional behavioral note text and **attached** portfolio count. Dimensions include: why inVision U, program fit, challenge overcome, goals/purpose, leadership, support/encouragement, communication clarity, portfolio evidence. **Overall score** → **Priority**, **Standard**, or **Manual** review (with small adjustments for medium/high authenticity risk).
 
 ## Explainability
 
-- **Hard-rule summary** lists completeness and eligibility outcomes in plain language.
-- **Rationale panel** lists factor-level explanations (what was considered, fairness note).
-- **Explanation tags** highlight notable dimensions (e.g. leadership signals, risk flags).
+- **Hard-rule summary** — completeness and eligibility in plain language.
+- **Committee rationale** — factor-level explanations tied to video prompts where relevant.
+- **Explanation tags** — quick highlights (including authenticity risk **signals**).
 
-## AI / authenticity note
+## Authenticity risk signals
 
-- **No real video ML or ASR** — transcript is pasted or prefilled text standing in for future multimodal pipelines.
-- **`text_authenticity_risk`** and **`video_authenticity_risk`** are **low / medium / high** heuristic indicators only (generic phrasing, specificity, template cues, program mismatch). They are **not** proof of misconduct and **must not** auto-reject.
+- **Not** verified AI detection; **not** auto-reject.
+- **`text_authenticity_risk`** / **`video_authenticity_risk`** — low/medium/high heuristics (generic phrasing, specificity, first-person detail, concrete anchors, program wording overlap, video declared).
 
 ## Programs & subject mapping
 
-Defined in `src/data/programs.ts`:
-
-- **Math + Geography** → Sociology of Innovation and Leadership **or** Strategies of Public Administration and Development  
-- **Math + Informatics** → Innovative Digital Products and Services  
-- **Math + Physics** → Creative Engineering  
-- **History of Kazakhstan + Reading Literacy + 2 creative exams** → Digital Media and Marketing  
+Logic in `src/data/programs.ts`; applicant copy in `src/data/programGuide.ts`.
 
 ## Demo mode & synthetic data
 
-- Demo presets live in `src/demo/presets/`. Register new packages in `src/demo/presets/index.ts`.
-- Place future synthetic file references under `src/demo/assets/` (placeholders only in this repo).
-- **Stub preset** `stub_v1` provides a full synthetic application for judges.
+- Presets: `src/demo/presets/` (registry in `index.ts`).
+- Asset placeholders: `src/demo/assets/`.
+- **Stub** `stub_v1` — full synthetic package for one-click judge demos.
 
 ## Quick run
 
@@ -50,16 +53,12 @@ npm install
 npm run dev
 ```
 
-Open the printed local URL (e.g. `http://localhost:5173`).
+## Quick demo (judges)
 
-## Quick demo (for judges)
-
-1. Go to **`/apply`**.
-2. Ensure **Demo application** is selected.
-3. Click **Submit demo now (1-click)** — or **Load demo into form** then **Submit application**.
-4. Read the **Submission result** card (tier, score, hard rules, tags).
-5. Open **`/dashboard`** — the candidate appears in the list; select them for full detail, filters, and committee shortlist / note.
+1. **`/apply`** → **Demo application** → **Submit demo now (1-click)**.
+2. Read **Submission result** (routing headline, detail, tags).
+3. **`/dashboard`** → open the candidate; **Routing & recommendation** is at the top of the detail panel.
 
 ## Stack
 
-React 18, TypeScript, Vite, Tailwind CSS, React Router. Applications persist in **`localStorage`** (`invision-u-applications-v2`) for the MVP.
+React 18, TypeScript, Vite, Tailwind, React Router. Persistence: **`localStorage`** key `invision-u-applications-v3` (filenames + form JSON only).

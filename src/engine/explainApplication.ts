@@ -18,7 +18,8 @@ const completenessCopy: Record<CompletenessReason, string> = {
   missing_ent_certificate: 'Attach ENT certificate (simulated upload).',
   missing_english_certificate: 'Attach English certificate (simulated upload).',
   missing_portfolio: 'Attach at least one portfolio / additional document.',
-  missing_video: 'Provide a video link or mark video file attached.',
+  missing_video:
+    'Provide a video link, attach a video file, or paste a transcript/summary (at least ~50 characters).',
   missing_personality_summary: 'Complete the personality summary.',
 }
 
@@ -62,15 +63,16 @@ export function buildExplanationTags(
 ): string[] {
   const tags: string[] = []
   if (!sub) return tags
-  if (sub.leadership >= 65) tags.push('Leadership signals')
-  if (sub.motivation >= 65) tags.push('Strong motivation')
-  if (sub.resilienceGrowth >= 62) tags.push('Growth / resilience')
-  if (sub.teamworkProblemSolving >= 60) tags.push('Collaboration / problem-solving')
-  if (sub.communication >= 62) tags.push('Communication clarity')
+  if (sub.motivationInVisionU >= 64) tags.push('Why inVision U (transcript)')
+  if (sub.programFit >= 64) tags.push('Program fit')
+  if (sub.resilienceChallenge >= 62) tags.push('Challenge / resilience')
+  if (sub.goalsAndPurpose >= 62) tags.push('Goals & motivation')
+  if (sub.leadershipEvidence >= 62) tags.push('Leadership example')
+  if (sub.supportSystemEncouragement >= 60) tags.push('Support / encouragement')
+  if (sub.communicationClarity >= 62) tags.push('Communication clarity')
   if (sub.portfolioEvidence >= 70) tags.push('Portfolio evidence')
-  if (sub.programAlignment >= 68) tags.push('Program alignment')
-  if (textRisk === 'high') tags.push('Text authenticity risk (review)')
-  if (videoRisk === 'high') tags.push('Video authenticity risk (review)')
+  if (textRisk === 'high') tags.push('Text authenticity risk signal')
+  if (videoRisk === 'high') tags.push('Video authenticity risk signal')
   return tags
 }
 
@@ -114,48 +116,56 @@ export function buildExplainFactors(
 
   if (sub) {
     factors.push({
-      dimension: 'Motivation & values (transcript)',
-      impact: sub.motivation >= 60 ? 'positive' : 'neutral',
-      rationale: 'Keyword and structure heuristics on the declared transcript text.',
+      dimension: 'Why inVision U (video Q1)',
+      impact: sub.motivationInVisionU >= 58 ? 'positive' : 'neutral',
+      rationale:
+        'Signals from transcript/summary about motivation to join inVision U (prompt-aligned keywords).',
     })
     factors.push({
-      dimension: 'Leadership',
-      impact: sub.leadership >= 60 ? 'positive' : 'neutral',
-      rationale: 'Based on leadership-related language in transcript / personality summary.',
+      dimension: 'Program interest & fit (video Q2)',
+      impact: sub.programFit >= 58 ? 'positive' : 'neutral',
+      rationale:
+        'Language about program choice plus overlap with the selected track name.',
     })
     factors.push({
-      dimension: 'Resilience / growth',
-      impact: sub.resilienceGrowth >= 58 ? 'positive' : 'neutral',
-      rationale: 'Signals of challenges, support, and reflection.',
+      dimension: 'Challenge overcome (video Q3)',
+      impact: sub.resilienceChallenge >= 56 ? 'positive' : 'neutral',
+      rationale: 'References to difficulty, support, and what helped the applicant persist.',
     })
     factors.push({
-      dimension: 'Teamwork & problem-solving',
-      impact: sub.teamworkProblemSolving >= 58 ? 'positive' : 'neutral',
-      rationale: 'Collaboration and problem-solving cues in text.',
+      dimension: 'Long-term goals & purpose (video Q4)',
+      impact: sub.goalsAndPurpose >= 56 ? 'positive' : 'neutral',
+      rationale: 'Future orientation, motivation, and intended impact.',
     })
     factors.push({
-      dimension: 'Communication',
-      impact: sub.communication >= 58 ? 'positive' : 'neutral',
-      rationale: 'First-person detail and length used as transparent proxies — not NLP “black box”.',
+      dimension: 'Leadership (video Q5)',
+      impact: sub.leadershipEvidence >= 56 ? 'positive' : 'neutral',
+      rationale: 'Examples or language about responsibility, initiative, or leading others.',
     })
     factors.push({
-      dimension: 'Program alignment',
-      impact: sub.programAlignment >= 62 ? 'positive' : 'neutral',
-      rationale: 'Overlap between transcript and selected program themes.',
+      dimension: 'Support system (video Q6)',
+      impact: sub.supportSystemEncouragement >= 54 ? 'positive' : 'neutral',
+      rationale: 'Family/support and encouragement (non-scoring for admission by itself).',
     })
     factors.push({
-      dimension: 'Portfolio / evidence',
+      dimension: 'Communication clarity',
+      impact: sub.communicationClarity >= 56 ? 'positive' : 'neutral',
+      rationale:
+        'First-person usage, length, and simple structure proxies — transparent, not “black box”.',
+    })
+    factors.push({
+      dimension: 'Portfolio / additional evidence',
       impact: sub.portfolioEvidence >= 65 ? 'positive' : 'neutral',
-      rationale: 'Attachments present increase evidence score in this MVP.',
+      rationale: 'Declared portfolio attachments strengthen evidence in this MVP.',
     })
   }
 
   factors.push({
-    dimension: 'Authenticity risk (advisory)',
+    dimension: 'Authenticity risk signals',
     impact:
       textRisk === 'high' || videoRisk === 'high' ? 'negative' : 'neutral',
     rationale:
-      'Heuristic flags for committee review only — not automated rejection.',
+      'Heuristic risk flags to aid manual review — not verified AI detection and not auto-rejection.',
   })
 
   if (overall !== null) {

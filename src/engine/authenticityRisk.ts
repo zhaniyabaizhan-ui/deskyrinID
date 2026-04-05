@@ -19,8 +19,7 @@ function levelFromScore(score: number): RiskLevel {
 }
 
 /**
- * Risk indicators only — not proof of misconduct.
- * Uses transcript + declared program name overlap.
+ * Authenticity risk signals for manual review — not proof of AI use or fraud.
  */
 export function assessAuthenticityRisks(f: ApplicationFormData): {
   textAuthenticityRisk: RiskLevel
@@ -34,19 +33,32 @@ export function assessAuthenticityRisks(f: ApplicationFormData): {
 
   if (t.length > 0 && t.length < 80) {
     textScore += 2
-    notes.push('Transcript is very short — low specificity for review.')
+    notes.push(
+      'Risk signal: transcript is very short — low specificity; confirm in interview.'
+    )
   }
 
   const genericHits = GENERIC.filter((g) => lower.includes(g)).length
   if (genericHits >= 2) {
     textScore += 3
-    notes.push('Several generic / template-like phrases in transcript.')
+    notes.push(
+      'Risk signal: repeated generic / template-like phrasing (not proof of AI).'
+    )
   }
 
   const iCount = (lower.match(/\bi\b/g) ?? []).length
   if (t.length > 200 && iCount < 3) {
     textScore += 2
-    notes.push('Limited first-person detail relative to length.')
+    notes.push('Risk signal: weak first-person detail vs length — probe lived experience.')
+  }
+
+  const hasNumbers = /\d/.test(t)
+  const hasConcrete = /project|school|club|city|year|month|teacher|team|event/i.test(t)
+  if (t.length > 200 && !hasNumbers && !hasConcrete) {
+    textScore += 1
+    notes.push(
+      'Risk signal: few concrete anchors (dates, places, named activities) vs claimed experience.'
+    )
   }
 
   if (f.programId) {
@@ -55,7 +67,9 @@ export function assessAuthenticityRisks(f: ApplicationFormData): {
     const mentionsProgram = tokens.some((w) => lower.includes(w))
     if (!mentionsProgram && t.length > 120) {
       textScore += 2
-      notes.push('Transcript mentions little that aligns with the selected program name.')
+      notes.push(
+        'Risk signal: little overlap with selected program wording — check alignment.'
+      )
     }
   }
 
@@ -64,13 +78,15 @@ export function assessAuthenticityRisks(f: ApplicationFormData): {
   let videoScore = textScore
   if (!f.videoUrl.trim() && !f.videoFile.attached && t.length > 0) {
     videoScore += 1
-    notes.push('Transcript present but no video link/file declared — verify asset.')
+    notes.push(
+      'Risk signal: transcript without declared video — verify recording exists.'
+    )
   }
 
   const videoAuthenticityRisk = levelFromScore(videoScore)
 
   if (notes.length === 0) {
-    notes.push('No elevated authenticity risk flags from heuristics.')
+    notes.push('No elevated text- or video-authenticity risk signals from heuristics.')
   }
 
   return { textAuthenticityRisk, videoAuthenticityRisk, notes }

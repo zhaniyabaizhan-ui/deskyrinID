@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 import type { SubmittedApplication } from '@/types/application'
-const STORAGE_KEY = 'invision-u-applications-v2'
+const STORAGE_KEY = 'invision-u-applications-v3'
 
 type ApplicationsContextValue = {
   applications: SubmittedApplication[]

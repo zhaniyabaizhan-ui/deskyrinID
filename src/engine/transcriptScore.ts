@@ -1,53 +1,96 @@
 import type { ApplicationFormData, MeritSubscores, ProgramId } from '@/types/application'
 import { PROGRAM_LABELS } from '@/data/programs'
 
-const MOTIVATION = [
-  'motivat',
-  'passion',
-  'goal',
-  'future',
-  'mission',
-  'impact',
-  'why',
+/**
+ * Keyword families mapped to the official video presentation prompts.
+ * Transparent heuristics — not ML; committee can override.
+ */
+const Q1_WHY_INVISION = [
   'invision',
+  'in vision',
+  'apply',
+  'applying',
+  'university',
+  'why ',
+  'want to join',
+  'opportunity',
+  'believe',
+  'drawn',
+]
+
+const Q2_PROGRAM_WHY = [
   'program',
-  'learn',
+  'track',
+  'interested',
+  'interest',
+  'because',
+  'choose',
+  'chose',
+  'sociology',
+  'administration',
+  'public admin',
+  'digital',
+  'engineering',
+  'creative',
+  'media',
+  'marketing',
+  'products',
+  'services',
 ]
 
-const LEADERSHIP = [
-  'lead',
-  'led',
-  'team',
-  'initiat',
-  'organiz',
-  'responsib',
-  'mentor',
-  'community',
-]
-
-const RESILIENCE = [
+const Q3_CHALLENGE = [
   'challenge',
-  'fail',
-  'mistake',
   'overcome',
   'difficult',
-  'support',
-  'family',
-  'encourag',
-  'grow',
+  'struggl',
+  'failed',
+  'failure',
+  'obstacle',
+  'helped',
+  'through',
+  'learned',
+  'mistake',
 ]
 
-const TEAMWORK = [
+const Q4_GOALS = [
+  'goal',
+  'goals',
+  'future',
+  'long-term',
+  'long term',
+  'motivat',
+  'life',
+  'career',
+  'purpose',
+  'contribute',
+  'impact',
+  'dream',
+]
+
+const Q5_LEADERSHIP = [
+  'lead',
+  'leader',
+  'leadership',
+  'initiat',
+  'responsib',
+  'example',
+  'organiz',
   'team',
-  'collabor',
-  'together',
-  'listen',
-  'solve',
-  'problem',
-  'conflict',
+  'mentor',
 ]
 
-const COMMUNICATION = ['i ', "i'm", 'my ', 'we ', 'our ', 'feel', 'share', 'tell']
+const Q6_SUPPORT = [
+  'family',
+  'support',
+  'mother',
+  'father',
+  'parent',
+  'parents',
+  'encourag',
+  'believes',
+  'decision',
+  'biggest',
+]
 
 function clamp(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, n))
@@ -58,81 +101,106 @@ function countHits(text: string, terms: string[]): number {
   return terms.reduce((n, term) => (lower.includes(term.trim()) ? n + 1 : n), 0)
 }
 
-function programKeywords(programId: ProgramId): string[] {
+function programTokens(programId: ProgramId): string[] {
   const label = PROGRAM_LABELS[programId].toLowerCase()
   return label.split(/[^a-z0-9]+/).filter((w) => w.length > 3)
 }
 
-/** Explainable heuristic scoring from transcript (+ portfolio flag). Not ML. */
+function firstPersonDensity(text: string): number {
+  const lower = text.toLowerCase()
+  const iCount = (lower.match(/\bi\b/g) ?? []).length
+  const words = text.split(/\s+/).filter(Boolean).length
+  if (words === 0) return 0
+  return iCount / words
+}
+
+/** Explainable heuristic scoring from transcript + optional behavioral summary. */
 export function scoreFromTranscript(
   f: ApplicationFormData
 ): MeritSubscores {
   const text = `${f.videoTranscript}\n${f.personality.summary}`.trim()
-  const base = 38
+  const base = 36
   const wc = text.split(/\s+/).filter(Boolean).length
+  const lower = text.toLowerCase()
 
-  const motivation = clamp(
-    base + countHits(text, MOTIVATION) * 6 + (wc > 120 ? 10 : 0),
-    0,
-    100
-  )
-  const leadership = clamp(
-    base + countHits(text, LEADERSHIP) * 7 + (wc > 100 ? 8 : 0),
-    0,
-    100
-  )
-  const resilienceGrowth = clamp(
-    base + countHits(text, RESILIENCE) * 7 + (wc > 80 ? 6 : 0),
-    0,
-    100
-  )
-  const teamworkProblemSolving = clamp(
-    base + countHits(text, TEAMWORK) * 6 + (wc > 90 ? 6 : 0),
+  const motivationInVisionU = clamp(
+    base +
+      countHits(text, Q1_WHY_INVISION) * 7 +
+      (lower.includes('invision') || lower.includes('in vision') ? 12 : 0) +
+      (wc > 100 ? 8 : 0),
     0,
     100
   )
 
-  const firstPersonHits = COMMUNICATION.reduce(
-    (n, term) => n + (text.toLowerCase().split(term).length - 1),
-    0
-  )
-  const communication = clamp(
-    base + Math.min(28, firstPersonHits * 2) + (wc > 150 ? 12 : wc > 60 ? 4 : 0),
-    0,
-    100
-  )
-
-  let programAlignment = 40
+  let programFit = base + countHits(text, Q2_PROGRAM_WHY) * 5 + (wc > 90 ? 6 : 0)
   if (f.programId) {
-    const kw = programKeywords(f.programId as ProgramId)
-    const hits = kw.filter((k) => text.toLowerCase().includes(k)).length
-    programAlignment = clamp(35 + hits * 12, 0, 100)
+    const tok = programTokens(f.programId as ProgramId)
+    const hits = tok.filter((t) => lower.includes(t)).length
+    programFit += hits * 10
   }
+  programFit = clamp(programFit, 0, 100)
 
+  const resilienceChallenge = clamp(
+    base + countHits(text, Q3_CHALLENGE) * 8 + (wc > 80 ? 6 : 0),
+    0,
+    100
+  )
+
+  const goalsAndPurpose = clamp(
+    base + countHits(text, Q4_GOALS) * 7 + (wc > 100 ? 8 : 0),
+    0,
+    100
+  )
+
+  const leadershipEvidence = clamp(
+    base + countHits(text, Q5_LEADERSHIP) * 7 + (wc > 85 ? 6 : 0),
+    0,
+    100
+  )
+
+  const supportSystemEncouragement = clamp(
+    base + countHits(text, Q6_SUPPORT) * 9 + (wc > 70 ? 4 : 0),
+    0,
+    100
+  )
+
+  const fp = firstPersonDensity(text)
+  const communicationClarity = clamp(
+    base +
+      Math.round(fp * 420) +
+      (wc > 140 ? 14 : wc > 90 ? 6 : 0) +
+      (text.split(/[.!?]+/).filter((s) => s.trim().length > 8).length > 4 ? 6 : 0),
+    0,
+    100
+  )
+
+  const portfolioN = f.uploads.portfolio.filter((p) => p.attached).length
   const portfolioEvidence =
-    f.uploads.portfolio.length > 0
-      ? clamp(55 + f.uploads.portfolio.length * 8 + (wc > 100 ? 10 : 0), 0, 100)
-      : clamp(32 + (wc > 80 ? 8 : 0), 0, 100)
+    portfolioN > 0
+      ? clamp(52 + portfolioN * 9 + (wc > 100 ? 10 : 0), 0, 100)
+      : clamp(30 + (wc > 90 ? 10 : 0), 0, 100)
 
   return {
-    motivation,
-    leadership,
-    resilienceGrowth,
-    teamworkProblemSolving,
-    communication,
-    programAlignment,
+    motivationInVisionU,
+    programFit,
+    resilienceChallenge,
+    goalsAndPurpose,
+    leadershipEvidence,
+    supportSystemEncouragement,
+    communicationClarity,
     portfolioEvidence,
   }
 }
 
 export function aggregateOverall(s: MeritSubscores): number {
   return Math.round(
-    s.motivation * 0.2 +
-      s.leadership * 0.18 +
-      s.resilienceGrowth * 0.16 +
-      s.teamworkProblemSolving * 0.14 +
-      s.communication * 0.14 +
-      s.programAlignment * 0.1 +
-      s.portfolioEvidence * 0.08
+    s.motivationInVisionU * 0.15 +
+      s.programFit * 0.15 +
+      s.resilienceChallenge * 0.13 +
+      s.goalsAndPurpose * 0.13 +
+      s.leadershipEvidence * 0.12 +
+      s.supportSystemEncouragement * 0.08 +
+      s.communicationClarity * 0.12 +
+      s.portfolioEvidence * 0.12
   )
 }

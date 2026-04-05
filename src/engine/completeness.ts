@@ -30,10 +30,13 @@ export function evaluateCompleteness(
   if (!f.uploads.englishCertificate.attached) {
     reasons.push('missing_english_certificate')
   }
-  if (f.uploads.portfolio.length === 0) reasons.push('missing_portfolio')
-  const hasVideo =
-    Boolean(f.videoUrl.trim()) || Boolean(f.videoFile.attached)
-  if (!hasVideo) reasons.push('missing_video')
+  const portfolioOk = f.uploads.portfolio.some((p) => p.attached)
+  if (!portfolioOk) reasons.push('missing_portfolio')
+  const hasVideoOrTranscript =
+    Boolean(f.videoUrl.trim()) ||
+    Boolean(f.videoFile.attached) ||
+    f.videoTranscript.trim().length >= 50
+  if (!hasVideoOrTranscript) reasons.push('missing_video')
   if (!f.personality.summary.trim()) reasons.push('missing_personality_summary')
 
   return { complete: reasons.length === 0, reasons }
