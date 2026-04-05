@@ -1,64 +1,187 @@
-# inVision U — Two-sided admissions pre-screen (hackathon MVP)
+# inVision U Admissions Copilot
 
-Decision-support platform for **applicants** and the **admissions committee**. It is **not** an autonomous admissions system: **final decisions stay with the committee.**
+**Two-sided decision-support for inVision U intake** — structured applications, hard eligibility gates, explainable merit signals, and a committee workspace. **Not** an autonomous admissions system: the committee always decides admit, defer, or reject.
 
-## Product overview
+| | |
+|:---:|:---|
+| **Live Demo** | [Open demo](PASTE_LIVE_DEMO_LINK_HERE) |
+| **Demo Video** | [Watch walkthrough](PASTE_DEMO_VIDEO_LINK_HERE) |
+| **Pitch Deck** | [View deck](PASTE_PITCH_DECK_LINK_HERE) |
+| **Repository** | [Source](PASTE_REPOSITORY_LINK_HERE) |
 
-| Area | Route | Purpose |
-|------|--------|---------|
-| Applicant portal | `/apply` | **Demo** or **manual** application; documents (device upload or demo file); video link/file; **transcript-first** qualitative input; pipeline result. |
-| Committee dashboard | `/dashboard` | **Routing summary** up front; full package, hard rules, merit breakdown, explanation tags, authenticity **risk signals**, rationale, committee notes. |
+---
 
-Personal identity fields (name, contact, location, passport metadata) are **identification / review context only** — they **do not** feed scoring heuristics.
+## Why this matters
 
-## Applicant UX (MVP)
+inVision U needs to spot **leadership and trajectory**, not only formal scores. Today, heavy manual screening means:
 
-- **Autofill sample personal info** — one click for synthetic contact data (judges; not scored).
-- **Dual-path documents** — each required slot supports **Upload file** (stores filename only) or **Use demo file**.
-- **Portfolio** — **Add from device** (multi-file) or **Add demo document**; rows use the same dual-path control.
-- **Program block** — shows subject→program eligibility mapping inline.
-- **Behavioral & working-style note** — optional committee context; **not** a personality test and **not** a primary admission basis.
+- Strong candidates who present weakly on paper get lost early.
+- Essays and static forms are noisy (including generative-AI drift).
+- As volume grows, depth and consistency of first-pass review drop.
 
-## Scoring pipeline (explainable, multi-stage)
+This prototype **compresses routine checks** and **surfaces explainable signals** so the committee spends time on judgment, not data hunting.
 
-1. **Completeness** — personal fields, program, subject combination, ENT, English, required documents (≥1 portfolio attached), **video link OR video file OR transcript/summary (≥~50 chars)**, behavioral note summary. Missing items → **Incomplete** (no merit score).
-2. **Eligibility** — Kazakhstan-linked applicants: **ENT ≥ 80**; English thresholds (IELTS ≥ 6, TOEFL ≥ 80, Duolingo ≥ 105, other ≥ 65 demo scale); **subject combination matches program**. Fail → **Ineligible**.
-3. **Merit (eligible only)** — Heuristic scoring on **transcript/summary** (aligned to the six official video questions) plus optional behavioral note text and **attached** portfolio count. Dimensions include: why inVision U, program fit, challenge overcome, goals/purpose, leadership, support/encouragement, communication clarity, portfolio evidence. **Overall score** → **Priority**, **Standard**, or **Manual** review (with small adjustments for medium/high authenticity risk).
+---
 
-## Explainability
+## What we built
 
-- **Hard-rule summary** — completeness and eligibility in plain language.
-- **Committee rationale** — factor-level explanations tied to video prompts where relevant.
-- **Explanation tags** — quick highlights (including authenticity risk **signals**).
+| Layer | What it is |
+|--------|-------------|
+| **Applicant Portal** (`/apply`) | Full application path: identity & contact, academics, documents, video link/file, **transcript or detailed summary** (primary qualitative input), optional behavioral note for context. |
+| **Committee Dashboard** (`/dashboard`) | Search, filters, candidate package view, **routing summary**, hard-rule trace, merit breakdown, explanation tags, authenticity **risk signals**, notes & shortlist toggles. |
+| **Routing engine** | Deterministic pipeline: completeness → eligibility → merit (eligible only) → recommendation tier. |
+| **Demo Mode + Manual Mode** | Judges: one-click synthetic submit. Evaluators: realistic manual flow with real file picks (filenames stored locally in MVP). |
 
-## Authenticity risk signals
+Everything is **human-in-the-loop**: outputs are recommendations and review queues, not decisions.
 
-- **Not** verified AI detection; **not** auto-reject.
-- **`text_authenticity_risk`** / **`video_authenticity_risk`** — low/medium/high heuristics (generic phrasing, specificity, first-person detail, concrete anchors, program wording overlap, video declared).
+---
 
-## Programs & subject mapping
+## Product architecture
 
-Logic in `src/data/programs.ts`; applicant copy in `src/data/programGuide.ts`.
+```
+Applicant (/apply)          Committee (/dashboard)
+       │                            ▲
+       │ submit                     │ inspect package,
+       ▼                            │ scores, rationale, flags
+┌──────────────┐                    │
+│   Pipeline   │ ─── persisted ───────┘
+│ completeness │      (local)
+│ eligibility  │
+│ merit score  │
+└──────────────┘
+```
 
-## Demo mode & synthetic data
+Submissions are stored in the browser (`localStorage`) for the hackathon MVP — no backend required to demo the full loop.
 
-- Presets: `src/demo/presets/` (registry in `index.ts`).
-- Asset placeholders: `src/demo/assets/`.
-- **Stub** `stub_v1` — full synthetic package for one-click judge demos.
+---
 
-## Quick run
+## How the scoring pipeline works
+
+| Stage | Role | Outcome if failed |
+|--------|------|-------------------|
+| **1. Completeness** | Required fields, required documents (≥1 portfolio), and **video link OR video file OR transcript/summary** (~50+ chars), plus behavioral summary for completion rules. | **Incomplete** — no eligibility or merit scoring. |
+| **2. Eligibility** | Kazakhstan-linked applicants: **ENT ≥ 80**; English thresholds (IELTS ≥ 6, TOEFL ≥ 80, Duolingo ≥ 105, other ≥ 65 on demo scale); **subject combination matches selected program**. | **Ineligible** — merit not computed. |
+| **3. Merit** (eligible only) | Transparent heuristics on **transcript/summary** (aligned to official video prompts), optional behavioral text, and portfolio **attachment** count. Weighted **overall score**. | Drives **Priority / Standard / Manual** review; small nudges for medium/high authenticity risk. |
+
+**Hard rules and merit are separate.** Failing eligibility never produces a merit rank. Incomplete applications never hit eligibility or merit.
+
+---
+
+## Recommendation categories
+
+| Category | Meaning |
+|----------|---------|
+| **Incomplete** | Package missing required items; committee sees what’s missing. No merit score. |
+| **Ineligible** | Failed a hard gate (ENT / English / subject–program fit). No merit score. |
+| **Priority Review** | Eligible + strong overall score (after advisory risk adjustment). **Not** an offer. |
+| **Standard Review** | Eligible, mid band — normal queue. |
+| **Manual Review** | Lower band and/or elevated authenticity risk signals — extra human judgment encouraged. |
+
+---
+
+## Programs and eligibility mapping
+
+| Subject combination (ENT profile) | Eligible programs |
+|-------------------------------------|-------------------|
+| **Math + Geography** | Sociology of Innovation and Leadership · Strategies of Public Administration and Development |
+| **Math + Informatics** | Innovative Digital Products and Services |
+| **Math + Physics** | Creative Engineering |
+| **History of Kazakhstan + Reading Literacy + 2 creative exams** | Digital Media and Marketing |
+
+The form enforces **consistency**: selected program must match the declared combination. Logic lives in `src/data/programs.ts`.
+
+---
+
+## Data and candidate representation
+
+**Used for identification & operations (not scored):** name, citizenship, DOB, email, phone, city/country, application ID, document filenames.
+
+**Used for hard rules:** ENT, English exam type & score, citizenship/country (for Kazakhstan ENT rule only), program + subject combination.
+
+**Used for merit (eligible only):** video **transcript or detailed summary** (mapped to the six official presentation questions), optional **behavioral / working-style note**, **portfolio attachment** presence.
+
+**Not used:** demographic or socioeconomic features as success predictors; national ID numbers (passport/ID is upload metadata only).
+
+---
+
+## Baseline vs our improvement
+
+| | **Typical baseline** | **This prototype** |
+|--|----------------------|---------------------|
+| Intake | Ad-hoc email + attachments | Structured **Applicant Portal** + consistent fields |
+| First pass | Mental checklist, inconsistent | **Completeness** + **Eligibility** codified |
+| “Why this candidate?” | Tribal knowledge, hard to audit | **Hard-rule summary** + **rationale factors** + **tags** |
+| Qualitative signal | Long essays / uneven quality | **Transcript-first** narrative aligned to **video prompts** |
+| Risk of templated text | Often ignored until late | **Authenticity risk signals** (heuristic, advisory) |
+| Committee work | Tab sprawl | **Dashboard** with routing hero, package, scores, flags, notes |
+
+We do **not** claim to replace committee judgment — we **standardize the front of the funnel** and **make tradeoffs legible**.
+
+---
+
+## Validation and robustness approach
+
+MVP scope is **heuristic**, not a trained model — we still test it like a product:
+
+- **Scenario matrix:** complete vs incomplete; eligible vs each failure mode (ENT, English, subject mismatch); edge scores near thresholds.
+- **Synthetic profiles:** demo presets (`src/demo/presets/`) + manual mutations to confirm routing stability.
+- **Consistency:** same inputs → same tier and scores (deterministic engine in `src/engine/`).
+- **Inspectability:** rules and keyword families are **readable in code** — no hidden score on identity fields.
+
+Future work: labeled committee outcomes, held-out calibration, and optional ASR/video features — out of scope for this build.
+
+---
+
+## Fairness, explainability, and privacy
+
+- **No autonomous admissions** — final decisions stay with the committee; UI states this explicitly.
+- **No demographic or socioeconomic scoring** — merit uses transcript/summary, program alignment heuristics, portfolio evidence flags, and optional behavioral text — not name, contact, or location as score inputs.
+- **Authenticity outputs are risk indicators only** — not proof of AI or fraud; framed for manual review.
+- **Demo data is synthetic** — presets for speed; production would use real consent and retention policies.
+- **Explainability by design** — stage-gated pipeline, factor list, tags, and hard-rule copy the committee can challenge or override.
+
+---
+
+## Limitations
+
+- **Transcript/summary stand-in** — no real ASR or video understanding in this repo.
+- **Authenticity** — lightweight text heuristics; **not** production AI-generated-text detection.
+- **Documents** — filenames only locally; no OCR, virus scan, or secure vault.
+- **Persistence** — browser `localStorage`; not multi-user or audit-logged like production.
+- **English thresholds** — demo-scale cutoffs, configurable in code, not legally certified.
+
+---
+
+## Quick demo for judges
+
+1. Open **[Live Demo](PASTE_LIVE_DEMO_LINK_HERE)** (or run locally — below).
+2. Go to **`/apply`**.
+3. Select **Demo application** → **Submit demo now (1-click)**.
+4. Read **Submission result** (routing, hard rules, tags).
+5. Open **`/dashboard`** → select the candidate.
+6. Review **Routing & recommendation** (top), **files**, **transcript**, **merit breakdown**, **authenticity risk signals**, **rationale**.
+
+**Under 60 seconds** end-to-end.
+
+---
+
+## Local run
 
 ```bash
 npm install
 npm run dev
 ```
 
-## Quick demo (judges)
+Open the URL Vite prints (e.g. `http://localhost:5173`). Routes: **`/apply`**, **`/dashboard`**.
 
-1. **`/apply`** → **Demo application** → **Submit demo now (1-click)**.
-2. Read **Submission result** (routing headline, detail, tags).
-3. **`/dashboard`** → open the candidate; **Routing & recommendation** is at the top of the detail panel.
+Data persists under **`localStorage`** key `invision-u-applications-v3`.
 
-## Stack
+---
 
-React 18, TypeScript, Vite, Tailwind, React Router. Persistence: **`localStorage`** key `invision-u-applications-v3` (filenames + form JSON only).
+## Tech stack
+
+**React 18 · TypeScript · Vite · Tailwind CSS · React Router** — client-only MVP with a small, explicit `src/engine/` evaluation layer (no opaque model API).
+
+---
+
+*Built for Decentrathon 5.0 / inVision U — admissions intelligence as copilot, not autopilot.*

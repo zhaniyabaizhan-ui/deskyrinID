@@ -2,3 +2,6 @@ node_modules
 dist
 *.local
 .DS_Store
+
+# Avoid huge binaries breaking GitHub pushes
+public/demo-candidates/**/*.mp4

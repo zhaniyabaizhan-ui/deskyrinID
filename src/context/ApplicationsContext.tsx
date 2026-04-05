@@ -8,6 +8,8 @@ import {
   type ReactNode,
 } from 'react'
 import type { SubmittedApplication } from '@/types/application'
+import { mergeBuiltinAidyn } from '@/builtin/aidyn'
+
 const STORAGE_KEY = 'invision-u-applications-v3'
 
 type ApplicationsContextValue = {
@@ -38,7 +40,7 @@ export function ApplicationsProvider({ children }: { children: ReactNode }) {
   const [applications, setApplications] = useState<SubmittedApplication[]>([])
 
   useEffect(() => {
-    setApplications(loadFromStorage())
+    setApplications(mergeBuiltinAidyn(loadFromStorage()))
   }, [])
 
   useEffect(() => {

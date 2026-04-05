@@ -499,7 +499,7 @@ export default function ApplyPage() {
               label="Video file (optional if link or transcript is provided)"
               value={form.videoFile}
               accept="video/*"
-              demoFileName="demo_presentation.mp4"
+              demoFileName="preview-poster.svg"
               onChange={(v) => update({ videoFile: v })}
             />
           </div>
